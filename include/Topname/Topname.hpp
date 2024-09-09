@@ -4,6 +4,7 @@
 #include <algorithm> // std::ranges::find_if, std::ranges::for_each
 #include <array>
 #include <functional> // std::invoke
+#include <iterator> // for std::random_access_iterator_tag
 #include <ostream>
 #include <stdexcept>
 #include <string_view>
@@ -70,6 +71,33 @@ constexpr bool case_insensitive_equal(std::string_view a, std::string_view b) {
  */
 template<EnumType E, std::size_t N>
 class EnumString {
+private:
+    /**
+     * @brief A struct representing an enum-string pair.
+     */
+    struct EnumStringPair {
+        E enum_val;
+        std::string_view string_val;
+    };
+
+    std::array<EnumStringPair, N> mappings; /**< The array of enum-string pairs. */
+
+    static constexpr std::size_t HASH_TABLE_SIZE = N * 2;
+    std::array<std::pair<uint32_t, E>, HASH_TABLE_SIZE> hash_table{};
+
+    /**
+     * @brief Builds the hash table for quicker lookups.
+     */
+    constexpr void build_hash_table() {
+        for (const auto& pair : mappings) {
+            uint32_t h = hash(pair.string_val) % HASH_TABLE_SIZE;
+            while (hash_table[h].first != 0) {
+                h = (h + 1) % HASH_TABLE_SIZE;
+            }
+            hash_table[h] = {hash(pair.string_val), pair.enum_val};
+        }
+    }
+
 public:
     /**
      * @brief Constructs an EnumString with a list of enum-string pairs.
@@ -268,32 +296,83 @@ public:
     template<EnumType F, std::size_t M>
     friend std::ostream& operator<<(std::ostream& os, F enum_val);
 
-private:
     /**
-     * @brief A struct representing an enum-string pair.
+     * @class Iterator
+     * @brief A random access iterator for EnumStringPair objects.
+     * 
+     * Provides basic functionality for iterating through EnumStringPair objects
+     * using random access. Supports standard iterator operations like increment,
+     * decrement, pointer dereferencing, and arithmetic.
      */
-    struct EnumStringPair {
-        E enum_val;
-        std::string_view string_val;
+    class Iterator {
+    private:
+        const EnumStringPair* m_ptr;
+
+    public:
+        using iterator_category = std::random_access_iterator_tag;
+        using value_type = const EnumStringPair;
+        using difference_type = ptrdiff_t;
+        using pointer = const EnumStringPair*;
+        using reference = const EnumStringPair&;
+        
+        Iterator(pointer ptr) : m_ptr(ptr) {}
+        
+        reference operator*() const { return *m_ptr; }
+        pointer operator->() const { return m_ptr; }
+        
+        Iterator& operator++() { ++m_ptr; return *this; }
+        Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+        
+        Iterator& operator--() { --m_ptr; return *this; }
+        Iterator operator--(int) { Iterator tmp = *this; --(*this); return tmp; }
+        
+        Iterator& operator+=(difference_type n) { m_ptr += n; return *this; }
+        Iterator operator+(difference_type n) const { return Iterator(m_ptr + n); }
+        
+        Iterator& operator-=(difference_type n) { m_ptr -= n; return *this; }
+        Iterator operator-(difference_type n) const { return Iterator(m_ptr - n); }
+        
+        difference_type operator+(const Iterator& other) const { return m_ptr + other.m_ptr; }
+        difference_type operator-(const Iterator& other) const { return m_ptr - other.m_ptr; }
+        
+        reference operator[](difference_type n) const { return m_ptr[n]; }
+        
+        bool operator==(const Iterator& other) const { return m_ptr == other.m_ptr; }
+        bool operator!=(const Iterator& other) const { return m_ptr != other.m_ptr; }
+        bool operator<=(const Iterator& other) const { return m_ptr <= other.m_ptr; }
+        bool operator>=(const Iterator& other) const { return m_ptr >= other.m_ptr; }
+        bool operator<(const Iterator& other) const { return m_ptr < other.m_ptr; }
+        bool operator>(const Iterator& other) const { return m_ptr > other.m_ptr; }
     };
-
-    std::array<EnumStringPair, N> mappings; /**< The array of enum-string pairs. */
-
-    static constexpr std::size_t HASH_TABLE_SIZE = N * 2;
-    std::array<std::pair<uint32_t, E>, HASH_TABLE_SIZE> hash_table{};
+    
+    /**
+     * @brief Returns an iterator to the beginning of the collection.
+     * 
+     * @return An iterator pointing to the first element in the collection.
+     */
+    [[nodiscard]] Iterator begin() const { return Iterator(mappings.data()); }
+    
+    /**
+     * @brief Returns an iterator to the end of the collection.
+     * 
+     * @return An iterator pointing to one past the last element in the collection.
+     */
+    [[nodiscard]] Iterator end() const { return Iterator(mappings.data() + N); }
+    
+    /**
+     * @brief Returns a reverse iterator to the last element of the collection.
+     * 
+     * @return A reverse iterator pointing to the last element.
+     */
+    [[nodiscard]] Iterator rbegin() const { return Iterator(mappings.data() + N - 1); }
 
     /**
-     * @brief Builds the hash table for quicker lookups.
+     * @brief Returns a reverse iterator to one before the first element of the collection.
+     * 
+     * @return A reverse iterator pointing to one before the first element.
      */
-    constexpr void build_hash_table() {
-        for (const auto& pair : mappings) {
-            uint32_t h = hash(pair.string_val) % HASH_TABLE_SIZE;
-            while (hash_table[h].first != 0) {
-                h = (h + 1) % HASH_TABLE_SIZE;
-            }
-            hash_table[h] = {hash(pair.string_val), pair.enum_val};
-        }
-    }
+    [[nodiscard]] Iterator rend() const { return Iterator(mappings.data() - 1); }
+
 }; // class EnumString
 
 /**

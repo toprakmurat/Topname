@@ -91,5 +91,16 @@ int main() {
     std::chrono::duration<double> diff = end - start;
     std::cout << "Time to perform " << iterations << " lookups: " << diff.count() << " s" << std::endl;
 
+    // Test 8: Iterator tests
+    std::cout << "\nTest 8: Iterator test" << std::endl;
+    for (auto it = planet_names.begin(); it != planet_names.end(); ++it) {
+        std::cout << it->string_val << std::endl;
+    }
+    
+    std::cout << " \n Reverse Iterator" << std::endl;
+    for (auto it = planet_names.rbegin(); it != planet_names.rend(); --it) {
+        std::cout << it->string_val << std::endl;
+    }
+    
     return 0;
 }
