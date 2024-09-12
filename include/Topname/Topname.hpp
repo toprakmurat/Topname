@@ -12,6 +12,30 @@
 #include <vector>
 
 namespace Topname {
+/**
+ * @brief Exception class for EnumString-related errors.
+ *
+ * This class derives from std::runtime_error and provides additional
+ * information about the specific type of error that occurred in the
+ * EnumString operations.
+ */
+class EnumStringException : public std::runtime_error {
+public:
+    enum class ErrorCode {
+        InvalidEnumValue,
+        InvalidStringValue,
+        OutOfRange,
+        // Add more error codes as needed
+    };
+    
+    EnumStringException(ErrorCode error, const std::string& message)
+    : std::runtime_error(message), m_error_code(error) {}
+    
+    ErrorCode error_code() const { return m_error_code; }
+
+private:
+    ErrorCode m_error_code;
+};
 
 /**
  * @brief Concept to check if a type is an enum.
@@ -119,7 +143,7 @@ public:
      * 
      * @param value The string to convert.
      * @return The corresponding enum value.
-     * @throw std::out_of_range If the string does not match any enum value.
+     * @throw InvalidStringValue If the string does not match any enum value.
      */
     [[nodiscard]] constexpr E to_enum(std::string_view value) const {
         uint32_t h = hash(value) % HASH_TABLE_SIZE;
@@ -129,7 +153,8 @@ public:
             }
             h = (h + 1) % HASH_TABLE_SIZE;
         }
-        throw std::out_of_range("String value not found in the mapping");
+        auto err = EnumStringException::ErrorCode::InvalidStringValue;
+        throw EnumStringException(err, "String value not found in the mapping");
     }
 
     /**
@@ -139,15 +164,17 @@ public:
      * 
      * @param value The string to convert.
      * @return The corresponding enum value.
-     * @throw std::out_of_range If the string does not match any enum value.
+     * @throw InvalidStringValue If the string does not match any enum value.
      */
     [[nodiscard]] constexpr E to_enum_insensitive(std::string_view value) const {
         auto it = std::ranges::find_if(mappings, [value](const auto& pair) {
             return case_insensitive_equal(pair.string_val, value);
         });
 
-        if (it == mappings.end())
-            throw std::out_of_range("String value not found in the mapping");
+        if (it == mappings.end()) {
+            auto err = EnumStringException::ErrorCode::InvalidStringValue;
+            throw EnumStringException(err, "String value not found in the mapping");
+        }
 
         return it->enum_val;
     }
@@ -157,15 +184,16 @@ public:
      * 
      * @param enum_value The enum value to convert.
      * @return The corresponding string.
-     * @throw std::out_of_range If the enum value does not match any string.
+     * @throw InvalidEnumValue If the enum value does not match any string.
      */
     [[nodiscard]] constexpr std::string_view to_string(E value) const {
         auto it = std::ranges::find_if(mappings, [value](const auto& pair) {
             return pair.enum_val == value; });
 
-        if (it == mappings.end())
-            throw std::out_of_range("Enum value not found in the mapping");
-
+        if (it == mappings.end()) {
+            auto err = EnumStringException::ErrorCode::InvalidEnumValue;
+            throw EnumStringException(err, "Enum value not found in the mapping");
+        }
         return it->string_val;
     }
 
