@@ -3,9 +3,12 @@
 
 #include <algorithm> // std::ranges::find_if, std::ranges::for_each
 #include <array>
+#include <cstdint>
 #include <functional> // std::invoke
 #include <iterator> // for std::random_access_iterator_tag
-#include <ostream>
+#include <iostream>
+#include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
@@ -158,6 +161,21 @@ public:
     }
 
     /**
+     * @brief Safely converts enum to string without throwing exceptions.
+     */
+    [[nodiscard]] constexpr std::optional<E> to_enum_try(std::string_view value) const {
+        uint32_t h = hash(value) % HASH_TABLE_SIZE;
+        while (hash_table[h].first != 0) {
+            if (hash_table[h].first == hash(value)) {
+                return hash_table[h].second;
+            }
+            h = (h + 1) % HASH_TABLE_SIZE;
+        }
+
+        return std::nullopt;
+    }
+
+    /**
      * @brief Converts a string to its corresponding enum value (case-insensitive).
      * 
      * Average time complexity: O(n).
@@ -188,11 +206,26 @@ public:
      */
     [[nodiscard]] constexpr std::string_view to_string(E value) const {
         auto it = std::ranges::find_if(mappings, [value](const auto& pair) {
-            return pair.enum_val == value; });
+            return pair.enum_val == value;
+        });
 
         if (it == mappings.end()) {
             auto err = EnumStringException::ErrorCode::InvalidEnumValue;
             throw EnumStringException(err, "Enum value not found in the mapping");
+        }
+        return it->string_val;
+    }
+
+    /**
+     * @brief Safely converts enum to string without throwing exceptions.
+     */
+    [[nodiscard]] constexpr std::optional<std::string_view> to_string_try(E value) const {
+        auto it = std::ranges::find_if(mappings, [value](const auto& pair) {
+            return pair.enum_val == value;
+        });
+
+        if (it == mappings.end()) {
+            return std::nullopt;
         }
         return it->string_val;
     }
@@ -211,16 +244,34 @@ public:
     }
 
     /**
+     * @brief Returns a view of all enum values.
+     */
+    [[nodiscard]] constexpr auto view_enum_values() const {
+        return mappings | std::views::transform([](const auto& pair) {
+            return pair.enum_val;
+        });
+    }
+
+    /**
      * @brief Retrieves all string values from the mapping.
      * 
      * @return A vector containing all string values.
      */
     [[nodiscard]] constexpr std::array<std::string_view, N> get_string_all() const {
-        std::array<E, N> res;
+        constexpr std::array<std::string_view, N> res;
         for (std::size_t i = 0; i < N; i++) {
             res[i] = mappings[i].string_val;
         }
         return res;
+    }
+
+    /**
+     * @brief Returns a view of all string values.
+     */
+    [[nodiscard]] constexpr auto view_string_values() const {
+        return mappings | std::views::transform([](const auto& pair) {
+            return pair.string_val;
+        });
     }
 
     /**
@@ -400,6 +451,38 @@ public:
      * @return A reverse iterator pointing to one before the first element.
      */
     [[nodiscard]] Iterator rend() const { return Iterator(mappings.data() - 1); }
+
+    /**
+     * @brief Find iterator for enum value.
+     */
+    [[nodiscard]] Iterator find(E enum_val) const {
+        auto it = std::ranges::find_if(mappings, [enum_val](const auto& pair) {
+            return pair.enum_val == enum_val;
+        });
+
+        return Iterator(it == mappings.end() ? mappings.data() + N : &(*it));
+    }
+
+    /**
+     * @brief Find iterator for string value.
+     */
+    [[nodiscard]] Iterator find(std::string_view str_val) const {
+        auto it = std::ranges::find_if(mappings, [str_val](const auto& pair) {
+            return pair.string_val == str_val;
+        });
+
+        return Iterator(it == mappings.end() ? mappings.data() + N : &(*it));
+    }
+
+    /**
+     * @brief Returns the number of mappings at compile time.
+     */
+    static constexpr std::size_t size() noexcept { return N; }
+
+    /**
+     * @brief Checks if the mapping is empty.
+     */
+    static constexpr bool empty() noexcept { return N == 0; }
 
 }; // class EnumString
 

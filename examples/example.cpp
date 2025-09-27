@@ -1,5 +1,6 @@
 #include <iostream>
-#include <Topname.h>
+#include <chrono>
+#include "Topname.hpp"
 
 using namespace Topname;
 
@@ -20,7 +21,7 @@ int main() {
         Planet::NEPTUNE, "Neptune"
     );
 
-    std::cout << "Test 1: Basic conversion" << std::endl;
+    std::cout << "\nTest 1: Basic conversion" << std::endl;
     std::cout << planet_names.to_string(Planet::EARTH) << std::endl;
     std::cout << enum_to_underlying(planet_names.to_enum("Mars")) << std::endl;
 
