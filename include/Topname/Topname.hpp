@@ -231,6 +231,32 @@ public:
     }
 
     /**
+     * @brief Creates a lazy transform view producing the string representations of a range of enum values.
+     *
+     * Each element in the returned view is an std::optional<std::string_view> produced by calling
+     * to_string_try for the corresponding enum value. This allows the caller to inspect which enum
+     * values successfully map to strings without incurring exceptions or eager materialization.
+     *
+     * The transformation is lazy: no lookups are performed until the view is iterated.
+     *
+     * @tparam R A std::ranges::range whose range_value_t is (implicitly) convertible to E.
+     * @param enum_values The input range of enum values to be converted.
+     * @return A lazily-evaluated view where each element is std::optional<std::string_view>.
+     *
+     * @note Invalid (unmapped) enum values yield std::nullopt at the corresponding position.
+     * @warning The returned view references enum_values; ensure the source range outlives any use
+     *          of the view.
+     * @see to_string_try, to_string
+     */
+    template<std::ranges::range R>
+    requires std::convertible_to<std::ranges::range_value_t<R>, E>
+    [[nodiscard]] auto to_strings(const R& enum_values) const {
+        return enum_values | std::views::transform([this](const E& val) {
+            return this->to_string_try(val);
+        });
+    }
+
+    /**
      * @brief Retrieves all enum values from the mapping.
      * 
      * @return A vector containing all enum values.
@@ -258,7 +284,7 @@ public:
      * @return A vector containing all string values.
      */
     [[nodiscard]] constexpr std::array<std::string_view, N> get_string_all() const {
-        constexpr std::array<std::string_view, N> res;
+        std::array<std::string_view, N> res;
         for (std::size_t i = 0; i < N; i++) {
             res[i] = mappings[i].string_val;
         }
